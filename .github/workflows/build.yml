@@ -298,6 +298,38 @@ jobs:
           path: |
             icedtea-web/icedtea-web-*.macos.bin.*
 
+      - name: Import Code-Signing Certificates
+        if: github.event.inputs.release == 'True'
+        uses: Apple-Actions/import-codesign-certs@v1
+        with:
+          # The certificates in a PKCS12 file encoded as a base64 string
+          p12-file-base64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_BASE64 }}
+          # The password used to import the PKCS12 file.
+          p12-password: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+
+      - name: Codesign
+        run: |
+          export WORKSPACE="${PWD}"
+          export ENTITLEMENTS="$WORKSPACE/icedtea-web/.github/workflows/entitlements.plist"
+          export TMP_PATH="${WORKSPACE}/tmp"
+          export RELEASE_PATH="${WORKSPACE}/release"
+          export ARCHIVE_NAME_WITH_PATH="$(find . -name "icedtea-web-*.macos.bin.zip")"
+          export ARCHIVE_NAME="$(basename "${ARCHIVE_NAME_WITH_PATH}")"
+          mkdir ${TMP_PATH}
+          mkdir ${RELEASE_PATH}
+          unzip -q ${ARCHIVE_NAME_WITH_PATH} -d ${TMP_PATH}
+          cd ${TMP_PATH}
+          echo "Signing Binary"
+          FILES=$(find . -perm +111 -type f)
+          echo "$FILES" | while read -r f; do codesign --entitlements "$ENTITLEMENTS" --options runtime --timestamp --sign "Developer ID Application: London Jamocha Community CIC" "$f"; done
+          zip -rq ${ARCHIVE_NAME} *
+          cp ${ARCHIVE_NAME} ${RELEASE_PATH}/${ARCHIVE_NAME}
+          cd $RELEASE_PATH
+          for zip in icedtea-web-*; do
+            shasum -a 256 "$zip" > "$zip.sha256.txt"
+          done
+        if: github.event.inputs.release == 'True'
+
       - name: Upload binary
         uses: actions/upload-release-asset@v1
         if: github.event.inputs.release == 'True'
@@ -305,7 +337,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.release.outputs.upload_url }}
-          asset_path: icedtea-web/${{ github.event.inputs.version }}.macos.bin.zip
+          asset_path: release/${{ github.event.inputs.version }}.macos.bin.zip
           asset_name: ${{ github.event.inputs.version }}.macos.bin.zip
           asset_content_type: application/zip
 
@@ -316,7 +348,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.release.outputs.upload_url }}
-          asset_path: icedtea-web/${{ github.event.inputs.version }}.macos.bin.zip.sha256.txt
+          asset_path: release/${{ github.event.inputs.version }}.macos.bin.zip.sha256.txt
           asset_name: ${{ github.event.inputs.version }}.macos.bin.zip.sha256.txt
           asset_content_type: application/zip
 
