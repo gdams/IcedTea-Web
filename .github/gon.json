@@ -1,0 +1,10 @@
+{
+    "notarize": [{
+      "path": "icedtea-web-1.8.6.macos.bin.zip",
+      "bundle_id": "net.adoptopenjdk.itw"
+    }],
+  
+    "apple_id": {
+       "password": "@env:AC_PASSWORD"
+    }
+  }
